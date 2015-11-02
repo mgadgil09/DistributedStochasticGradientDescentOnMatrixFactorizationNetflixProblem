@@ -70,7 +70,7 @@ object SimpleApp {
     var blockrow = indexCreation(rows,Blknum)
     var blockcol = indexCreation(cols,Blknum)
 //cartesian products of row and col indices
-var car = sc.parallelize(blockrow).cartesian(sc.parallelize(blockcol))
+var car = sc.parallelize(blockrow).cartesian(sc.parallelize(blockcol)).collect()
 
   //my matrix to RDD[Vector]
     def matrixToRDD(m: Matrix):RDD[org.apache.spark.mllib.linalg.Vector] = {
@@ -92,7 +92,7 @@ var blkMatrix = distMatrix.toBlockMatrix
 var blocks = blkMatrix.blocks
 
 var x = car.map{case(x,y) => x(0)}	
-//I have my stratums
+//experiment
 def stratumMaker(x:Array[Int],y:Array[Int]):scala.collection.immutable.IndexedSeq[org.apache.spark.mllib.linalg.distributed.MatrixEntry] = {
 	var stratumEntries = for(i <- 0 to x.length-1) yield{
 			for(j <- 0 to y.length-1)yield{
@@ -105,26 +105,11 @@ def stratumMaker(x:Array[Int],y:Array[Int]):scala.collection.immutable.IndexedSe
 stratumMatrix
       
 }
-var makeStratums = car.map{case(x,y) => stratumMaker(x,y)}
-var stratumRdds = for(i <- makeStratums.collect()) yield {sc.parallelize(i)}
-var stratums:org.apache.spark.mllib.linalg.DenseMatrix = stratumRdds.map{case mentry => new CoordinateMatrix(mentry).toBlockMatrix.toLocalMatrix}
-//initializing W0 and H0
-var F = 3
-var w0 = org.apache.spark.mllib.linalg.DenseMatrix.rand(rowcount,F,new java.util.Random)
-var h0 = org.apache.spark.mllib.linalg.DenseMatrix.rand(F,colcount,new java.util.Random)
-//breeze Vij, W0, H0
-val breezew0 = new DenseMatrix[Double](w0.numRows,w0.numCols,w0.values)
-val breezeh0 = new DenseMatrix[Double](h0.numRows,h0.numCols,h0.values)
-var breezeVij = new org.apache.spark.mllib.linalg.DenseMatrix(stratums(0).numRows,stratums(0).numCols,stratums(0).toArray)
-//joining stratums with original matrix indices
-var vIJ = sc.parallelize(stratums).zipWithIndex.map{case(k,v) => (v,k)}.join(car.zipWithIndex.map{case(k,v) => (v,k)}).map{case(a,(b,c)) => (c,b)}
-vIJ.map{case((i,j),mat) =>
-		var I = i
-                var J = j
-                var Vij = mat
-                		
-
+var stratums = car.map{case(x,y) => stratumMaker(x,y)}
+var stratumRdds = for(i <- stratums.collect())yield{sc.parallelize(i)}
+var coordMatrix = stratumRdds.map{case mentry => new CoordinateMatrix(mentry).toBlockMatrix.toLocalMatrix}
 	
+	return stratumMatrix
 		
 
 
