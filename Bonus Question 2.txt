@@ -1,0 +1,45 @@
+import org.apache.spark.mllib.linalg.SingularValueDecomposition
+import org.apache.spark.mllib.linalg.distributed.{RowMatrix , CoordinateMatrix, MatrixEntry}
+import org.apache.spark.mllib.linalg.{Matrix , Vector, DenseVector}
+val file = sc.textFile("nf_subsample.csv")
+var ratings = file.map{umr => org.apache.spark.mllib.recommendation.Rating(umr.split(",")(0).toInt,umr.split(",")(1).toInt, umr.split(",")(2).toInt)}
+val distMatrix = new CoordinateMatrix(ratings.map {case org.apache.spark.mllib.recommendation.Rating(user, movie, rating) => MatrixEntry(user, movie, rating)})
+var rmat = distMatrix.toRowMatrix
+val svd: SingularValueDecomposition[RowMatrix, Matrix] = rmat.computeSVD(20, computeU = true)
+val U: RowMatrix = svd.U
+val s: Vector = svd.s
+val V: Matrix = svd.V
+var dense = new breeze.linalg.DenseVector(s.toArray)
+var diagSumMat = breeze.linalg.diag.apply(dense)
+
+var m:Matrix = org.apache.spark.mllib.linalg.Matrices.dense(diagSumMat.rows,diagSumMat.cols,diagSumMat.data)
+var UtimesS = U.multiply(m)
+var svdDash = UtimesS.multiply(V.transpose)
+ var origV = distMatrix.toRowMatrix.rows
+var dupV = svdDash.rows
+var arrOrigV = origV.map{case(vec) => vec.toDense}
+var original = arrOrigV.flatMap{case(vec) => vec.values}.collect()
+ var duplicate = dupV.flatMap{case(vec) => vec.toDense.values}.collect()
+var Uvalues = U.rows.flatMap{case(vec) => vec.toDense.values}.collect()
+var Vvalues = V.toArray
+var nzsl = 0.0
+var Usum = 0.0
+var Vsum = 0.0
+for(i <- 0 to original.size - 1)yield{
+	nzsl = nzsl + scala.math.pow((original(i) - duplicate(i)),2)
+}
+
+for(i <- 0 to Uvalues.length - 1)yield{
+	Usum = Usum + scala.math.pow(Uvalues(i),2)
+}
+for(i <- 0 to Vvalues.length - 1)yield{
+	Vsum = Vsum + scala.math.pow(Vvalues(i),2)
+}
+
+var L2 = Math.sqrt(nzsl + 0.1*(Math.sqrt(Usum) + Math.sqrt(Vsum)))
+//------------------------------------------------------------------------------
+L2 is 209.02196447847643 
+
+//my DSGD-MF program output
+
+L2 is 9908.493028449217

@@ -1,0 +1,61 @@
+import org.apache.spark.mllib.linalg.{Matrix, Matrices}
+import org.apache.spark.mllib.linalg.distributed.RowMatrix
+import org.apache.spark.mllib.linalg._
+import org.apache.spark.rdd.RDD
+import org.apache.spark.mllib.linalg.distributed.{CoordinateMatrix, MatrixEntry}
+
+    val file = sc.textFile("nf_subsample.csv")
+//didn't know i had to work on 2000*2000 data
+//now i have to create distributed matrix.
+//creating ratings from my original data
+var ratings = file.map{umr => org.apache.spark.mllib.recommendation.Rating(umr.split(",")(0).toInt,umr.split(",")(1).toInt, umr.split(",")(2).toInt)}
+//now creating distributed co-ordinate matrix
+val distMatrix = new CoordinateMatrix(ratings.map {case org.apache.spark.mllib.recommendation.Rating(user, movie, rating) => MatrixEntry(user, movie, rating)}).toBlockMatrix.toLocalMatrix
+println("this is v:"+distMatrix)
+var distMatBcasted = sc.broadcast(distMatrix)
+var myMatrix = new org.apache.spark.mllib.linalg.DenseMatrix(distMatrix.numRows,distMatrix.numCols,distMatrix.toArray)
+var breezeMyMatrix = new breeze.linalg.DenseMatrix(distMatrix.numRows,distMatrix.numCols,distMatrix.toArray)
+
+
+//function
+	def converter(mat:breeze.linalg.DenseMatrix[Double]):Array[Double]={
+	var vd = 0.0
+	var Varr = for(i <- 0 to mat.rows-1)yield{
+	var Varr1 = for(j <- 0 to mat.cols-1)yield{
+			mat.apply(i,j)
+		 }
+		Varr1
+		}
+	return Varr.flatten.toArray
+	}
+
+
+var bsvd = breeze.linalg.svd.apply(breezeMyMatrix,20,0.001)
+var U = bsvd.U
+var S = bsvd.S
+var Vt = bsvd.Vt
+var diagSumMat = breeze.linalg.diag.apply(S)
+var reconstructedSVD = U*diagSumMat*Vt
+var diff = breezeMyMatrix - reconstructedSVD
+var mllibDense = converter(diff)
+var wSparse = converter(U)
+	var hSparse = converter(Vt)
+	var nzsl = 0.0
+	var wSqrSum = 0.0
+	var hSqrSum = 0.0
+for(i <- 0 to mllibDense.length-1){nzsl = nzsl + (scala.math.pow(mllibDense(i),2))}
+	for(i <- 0 to wSparse.length-1){wSqrSum = wSqrSum + (scala.math.pow(wSparse(i),2))}
+	for(i <- 0 to hSparse.length-1){hSqrSum = hSqrSum + (scala.math.pow(hSparse(i),2))}
+	var L2 = Math.sqrt(nzsl + 0.1*(Math.sqrt(wSqrSum) + Math.sqrt(hSqrSum)))
+	println("L2 is "+L2)	
+
+-------------------------------------------------------------------------------------------
+//Output is
+//L2 is 209.0219644784844
+//my output of dsgd-mf
+//L2 is 9911.978356718717
+
+
+
+	
+	

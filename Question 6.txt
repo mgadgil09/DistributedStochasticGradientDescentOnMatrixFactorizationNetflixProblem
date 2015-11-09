@@ -1,0 +1,67 @@
+My method  for DSGD
+
+1) I converted given data of Uer,Movie,Rating to matrix form such that UserIDs are rows Movie IDs are columns and Ratings are values. I used the Rating function for that and created a Co-ordinate matrix. Then I converted it to breeze dense matrix because later on I have worked only with breeze matrices.
+
+2) STRATIFICATION - 
+
+For this i have written a function IndexCreation first to divide the rows and columns by block number. No. of blocks are nothing but my total number of workers that I will be specifying while running my job. Index creation function has a generic logic for dividing the rows and columns.
+
+[BELOW VALUES ARE ONLY FOR UNDERSTANDING. HAVE WORKED ON ACTUAL VALUES]
+
+So eg. if Blocks are 2 and my Matrix has 5(0,1,2,3,4) rows and 4(0,1,2,3) columns, then i will have blocks with indices as below
+Row index division into block - (0,1)(2,3,4)
+Column index division into block - (0,1)(2,3)
+
+then i take a cartesian product of these 2 RDDs so that i get following index combinations
+
+(0,1)(0,1)  -- Matrix Block 1 
+(0,1)(2,3)  -- Matrix Block 2
+(2,3,4)(0,1) -- Matrix Block 3
+(2,3,4)(2,3) -- Matrix Block 4
+
+Now initialise W0 and H0 with random values between 0 and 1. W0 = Rows * Factor and H0 = Factor * Columns
+Broadcasted w0 and h0
+Declared and initialised variables that are required to calculate epsilon and broadcasted them
+
+Now I create my Stratums in the function createStratumsVWH and stratumMaker
+so I create block matrices from the original data matrix V as per the indices created in the function indexCreation.
+so now,
+STRATUM 1 will have diagonal blocks [0 0] [1 1] where 0 and 1 are pointers to the block indices
+STRATUM 2 will have blocks [0 1] [1 0] 
+0 0 --> (0,1)(0,1) 
+1 1 --> (2,3,4)(2,3)
+----------------------------
+0 1 --> (0,1)(2,3)
+1 0 --> (2,3,4)(0,1) 
+
+Using the above function I get my stratums with respective vij, wi*, h*j
+
+3) ACTUAL ALGORITHM BEGINS
+
+I have written a functions for SGD(createStratumsVWH) which has all the calculations as mentioned in the paper and assignment. 
+
+Then finally I begin Distributed SGD which runs for 100 iterations. 
+	a) Create stratums
+	b) first work on diagonal stratums - send them to workers to do SGD for all nonzero values
+	c) update W and H and broadcast them
+	d) calculate variables for epsilon and broadcast the global parameter that will be used on worker to calculate epsilon
+	e) work on other stratums - send them to workers to do SGD for all nonzero values for every stratum respectively
+	f) update W and H and broadcast them
+
+After 100 iterations, i get W and H updated.
+
+4)L2 REGULARIZATION
+
+	a) get the original V matrix
+	b) get the new V by multiplying new W and H
+	c) take their difference
+	d) square each element and add them all. This is L(NZSL)
+	e) take individual W and H, square each element of W and H and add the squared values seperately for W and H. [W^2] + [H^2]
+	f) L2 = L(NZSL + lambda*(SQRT(summed W^2) + SQRT(summed H^2)))
+	
+
+
+
+
+
+  
