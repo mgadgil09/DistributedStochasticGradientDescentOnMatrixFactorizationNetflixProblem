@@ -43,3 +43,6 @@ L2 is 209.02196447847643
 //my DSGD-MF program output
 
 L2 is 9908.493028449217
+
+Answer: Error rates can be matched if Epsilon is not in picture. SVD does not depend on epsilon factor. Tweaking the number of iterations may also change the error rate.
+

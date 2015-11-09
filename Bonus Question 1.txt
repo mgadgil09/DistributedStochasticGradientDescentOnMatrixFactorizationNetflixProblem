@@ -56,6 +56,12 @@ for(i <- 0 to mllibDense.length-1){nzsl = nzsl + (scala.math.pow(mllibDense(i),2
 //L2 is 9911.978356718717
 
 
+Answer: Reconstruction error mainly depends on the tweaking of Epsilon which means Beta and Summation(mbi) terms. In case of SVD this parameter is not into picture.
+		Moreover epsilon will vary according to the total number of iterations. But SVD is not iterative as such. 
+		So I do not think reconstruction error factor will be appropriate to come to concrete conclusion about comparison of those two. 
+
+
+
 
 	
 	
